@@ -30,6 +30,7 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase.Replace;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.samples.petclinic.owner.Owner;
 import org.springframework.samples.petclinic.owner.OwnerRepository;
@@ -37,6 +38,8 @@ import org.springframework.samples.petclinic.owner.Pet;
 import org.springframework.samples.petclinic.owner.PetType;
 import org.springframework.samples.petclinic.owner.PetTypeRepository;
 import org.springframework.samples.petclinic.owner.Visit;
+import org.springframework.samples.petclinic.vet.Specialty;
+import org.springframework.samples.petclinic.vet.SpecialtyRepository;
 import org.springframework.samples.petclinic.vet.Vet;
 import org.springframework.samples.petclinic.vet.VetRepository;
 import org.springframework.transaction.annotation.Transactional;
@@ -83,6 +86,9 @@ class ClinicServiceTests {
 
 	@Autowired
 	protected VetRepository vets;
+
+	@Autowired
+	protected SpecialtyRepository specialties;
 
 	private final Pageable pageable = Pageable.unpaged();
 
@@ -212,6 +218,32 @@ class ClinicServiceTests {
 		assertThat(vet.getNrOfSpecialties()).isEqualTo(2);
 		assertThat(vet.getSpecialties().get(0).getName()).isEqualTo("dentistry");
 		assertThat(vet.getSpecialties().get(1).getName()).isEqualTo("surgery");
+	}
+
+	@Test
+	void shouldFindVetsBySpecialty() {
+		// radiology=1, surgery=2, dentistry=3 in the sample data
+		assertThat(this.vets.findBySpecialtyId(1, Pageable.unpaged()).getContent()).extracting(Vet::getLastName)
+			.containsExactlyInAnyOrder("Leary", "Stevens");
+		assertThat(this.vets.findBySpecialtyId(2, Pageable.unpaged()).getContent()).extracting(Vet::getLastName)
+			.containsExactlyInAnyOrder("Douglas", "Ortega");
+		assertThat(this.vets.findBySpecialtyId(3, Pageable.unpaged()).getContent()).extracting(Vet::getLastName)
+			.containsExactly("Douglas");
+		assertThat(this.vets.findBySpecialtyId(999, Pageable.unpaged())).isEmpty();
+	}
+
+	@Test
+	void shouldPaginateVetsBySpecialty() {
+		Page<Vet> page = this.vets.findBySpecialtyId(1, PageRequest.of(0, 1));
+		assertThat(page.getContent()).hasSize(1);
+		assertThat(page.getTotalElements()).isEqualTo(2);
+		assertThat(page.getTotalPages()).isEqualTo(2);
+	}
+
+	@Test
+	void shouldFindSpecialtiesOrderedByName() {
+		assertThat(this.specialties.findSpecialties()).extracting(Specialty::getName)
+			.containsExactly("dentistry", "radiology", "surgery");
 	}
 
 	@Test

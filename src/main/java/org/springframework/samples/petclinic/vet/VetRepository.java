@@ -19,7 +19,9 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
+import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
@@ -54,5 +56,19 @@ public interface VetRepository extends Repository<Vet, Integer> {
 	@Transactional(readOnly = true)
 	@Cacheable("vets")
 	Page<Vet> findAll(Pageable pageable) throws DataAccessException;
+
+	/**
+	 * Retrieve the <code>Vet</code>s having the given {@link Specialty} from data store
+	 * in Pages
+	 * @param specialtyId the id of the {@link Specialty} to filter by
+	 * @param pageable
+	 * @return a Page of matching <code>Vet</code>s (empty if the specialty is unknown)
+	 * @throws DataAccessException
+	 */
+	@Transactional(readOnly = true)
+	@Cacheable("vets")
+	@Query("SELECT vet FROM Vet vet JOIN vet.specialties specialty WHERE specialty.id = :specialtyId")
+	Page<Vet> findBySpecialtyId(@Param("specialtyId") Integer specialtyId, Pageable pageable)
+			throws DataAccessException;
 
 }
