@@ -23,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.context.aot.DisabledInAotMode;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -33,6 +34,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.hasItem;
@@ -44,6 +46,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -232,6 +235,83 @@ class OwnerControllerTests {
 			.andExpect(model().attributeHasFieldErrorCode("owner", "lastName", "notFound"))
 			.andExpect(view().name("owners/findOwners"));
 
+	}
+
+	@Test
+	void processFindFormByFirstName() throws Exception {
+		Page<Owner> tasks = new PageImpl<>(List.of(george()));
+		when(this.owners.findByFirstNameStartingWithIgnoreCaseAndLastNameStartingWith(eq("geo"), eq(""),
+				any(Pageable.class)))
+			.thenReturn(tasks);
+		mockMvc.perform(get("/owners?page=1").param("firstName", "geo"))
+			.andExpect(status().is3xxRedirection())
+			.andExpect(view().name("redirect:/owners/" + TEST_OWNER_ID));
+		verify(this.owners, never()).findByLastNameStartingWith(anyString(), any(Pageable.class));
+	}
+
+	@Test
+	void processFindFormByFirstAndLastName() throws Exception {
+		Page<Owner> tasks = new PageImpl<>(List.of(george()));
+		when(this.owners.findByFirstNameStartingWithIgnoreCaseAndLastNameStartingWith(eq("George"), eq("Franklin"),
+				any(Pageable.class)))
+			.thenReturn(tasks);
+		mockMvc.perform(get("/owners?page=1").param("firstName", " George ").param("lastName", "Franklin"))
+			.andExpect(status().is3xxRedirection())
+			.andExpect(view().name("redirect:/owners/" + TEST_OWNER_ID));
+	}
+
+	@Test
+	void processFindFormWithEmptyFirstNameUsesLastNameSearch() throws Exception {
+		Page<Owner> tasks = new PageImpl<>(List.of(george()));
+		when(this.owners.findByLastNameStartingWith(eq("Franklin"), any(Pageable.class))).thenReturn(tasks);
+		mockMvc.perform(get("/owners?page=1").param("firstName", "  ").param("lastName", "Franklin"))
+			.andExpect(status().is3xxRedirection())
+			.andExpect(view().name("redirect:/owners/" + TEST_OWNER_ID));
+		verify(this.owners, never()).findByFirstNameStartingWithIgnoreCaseAndLastNameStartingWith(anyString(),
+				anyString(), any(Pageable.class));
+	}
+
+	@Test
+	void processFindFormByFirstNameNoOwnersFound() throws Exception {
+		when(this.owners.findByFirstNameStartingWithIgnoreCaseAndLastNameStartingWith(eq("Nobody"), eq(""),
+				any(Pageable.class)))
+			.thenReturn(new PageImpl<>(List.of()));
+		mockMvc.perform(get("/owners?page=1").param("firstName", "Nobody"))
+			.andExpect(status().isOk())
+			.andExpect(model().attributeHasFieldErrorCode("owner", "lastName", "notFound"))
+			.andExpect(view().name("owners/findOwners"));
+	}
+
+	@Test
+	void processFindFormRedirectsOutOfBoundsPageKeepingFirstName() throws Exception {
+		when(this.owners.findByFirstNameStartingWithIgnoreCaseAndLastNameStartingWith(eq("George"), eq(""),
+				any(Pageable.class)))
+			.thenReturn(new PageImpl<>(List.of(george())));
+		mockMvc.perform(get("/owners").param("page", "2").param("firstName", "George"))
+			.andExpect(status().is3xxRedirection())
+			.andExpect(redirectedUrl("/owners?page=1&firstName=George"));
+	}
+
+	@Test
+	void ownersListPaginationLinksKeepSearch() throws Exception {
+		when(this.owners.findByFirstNameStartingWithIgnoreCaseAndLastNameStartingWith(eq("J&J"), eq("Bl"),
+				any(Pageable.class)))
+			.thenReturn(new PageImpl<>(List.of(george(), george()), PageRequest.of(1, 5), 12));
+		mockMvc.perform(get("/owners").param("page", "2").param("firstName", "J&J").param("lastName", "Bl"))
+			.andExpect(status().isOk())
+			.andExpect(view().name("owners/ownersList"))
+			.andExpect(content().string(containsString("href=\"/owners?page=1&amp;lastName=Bl&amp;firstName=J%26J\"")))
+			.andExpect(content().string(containsString("href=\"/owners?page=3&amp;lastName=Bl&amp;firstName=J%26J\"")));
+	}
+
+	@Test
+	void ownersListPaginationLinksWithoutSearch() throws Exception {
+		when(this.owners.findByLastNameStartingWith(eq(""), any(Pageable.class)))
+			.thenReturn(new PageImpl<>(List.of(george(), george()), PageRequest.of(0, 5), 12));
+		mockMvc.perform(get("/owners"))
+			.andExpect(status().isOk())
+			.andExpect(content().string(containsString("href=\"/owners?page=2\"")))
+			.andExpect(content().string(not(containsString("Name="))));
 	}
 
 	@Test
