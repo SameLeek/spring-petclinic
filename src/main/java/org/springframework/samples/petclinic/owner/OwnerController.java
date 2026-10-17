@@ -102,13 +102,17 @@ class OwnerController {
 		else {
 			lastName = lastName.strip();
 		}
+		String firstName = owner.getFirstName() == null ? "" : owner.getFirstName().strip();
 
-		// find owners by last name
-		Page<Owner> ownersResults = findPaginatedForOwnersLastName(page, lastName);
+		// find owners by last name, and by first name if given
+		Page<Owner> ownersResults = findPaginatedForOwnersName(page, firstName, lastName);
 		if (page < 1 || page > Math.max(ownersResults.getTotalPages(), 1)) {
 			redirectAttributes.addAttribute("page", 1);
 			if (!lastName.isEmpty()) {
 				redirectAttributes.addAttribute("lastName", lastName);
+			}
+			if (!firstName.isEmpty()) {
+				redirectAttributes.addAttribute("firstName", firstName);
 			}
 			return "redirect:/owners";
 		}
@@ -126,6 +130,8 @@ class OwnerController {
 		}
 
 		// multiple owners found
+		model.addAttribute("lastName", lastName);
+		model.addAttribute("firstName", firstName);
 		return addPaginationModel(page, model, ownersResults);
 	}
 
@@ -138,11 +144,14 @@ class OwnerController {
 		return "owners/ownersList";
 	}
 
-	private Page<Owner> findPaginatedForOwnersLastName(int page, String lastname) {
+	private Page<Owner> findPaginatedForOwnersName(int page, String firstName, String lastName) {
 		int pageSize = 5;
 		int validatedPage = Math.max(page, 1);
 		Pageable pageable = PageRequest.of(validatedPage - 1, pageSize);
-		return owners.findByLastNameStartingWith(lastname, pageable);
+		if (firstName.isEmpty()) {
+			return owners.findByLastNameStartingWith(lastName, pageable);
+		}
+		return owners.findByFirstNameStartingWithIgnoreCaseAndLastNameStartingWith(firstName, lastName, pageable);
 	}
 
 	@GetMapping("/owners/{ownerId}/edit")

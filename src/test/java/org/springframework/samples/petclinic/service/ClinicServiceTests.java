@@ -102,6 +102,24 @@ class ClinicServiceTests {
 	}
 
 	@Test
+	void shouldFindOwnersByFirstName() {
+		assertThat(this.owners.findByFirstNameStartingWithIgnoreCaseAndLastNameStartingWith("je", "", pageable))
+			.extracting(Owner::getLastName)
+			.containsExactlyInAnyOrder("Coleman", "Black");
+
+		assertThat(this.owners.findByFirstNameStartingWithIgnoreCaseAndLastNameStartingWith("DAV", "", pageable))
+			.extracting(Owner::getLastName)
+			.containsExactly("Schroeder");
+
+		assertThat(this.owners.findByFirstNameStartingWithIgnoreCaseAndLastNameStartingWith("Je", "Bl", pageable))
+			.extracting(Owner::getLastName)
+			.containsExactly("Black");
+
+		assertThat(this.owners.findByFirstNameStartingWithIgnoreCaseAndLastNameStartingWith("zzz", "", pageable))
+			.isEmpty();
+	}
+
+	@Test
 	void shouldFindSingleOwnerWithPet() {
 		Optional<Owner> optionalOwner = this.owners.findById(1);
 		assertThat(optionalOwner).isPresent();
