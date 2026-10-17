@@ -38,35 +38,46 @@ class VetController {
 
 	private final VetRepository vetRepository;
 
-	public VetController(VetRepository vetRepository) {
+	private final SpecialtyRepository specialtyRepository;
+
+	public VetController(VetRepository vetRepository, SpecialtyRepository specialtyRepository) {
 		this.vetRepository = vetRepository;
+		this.specialtyRepository = specialtyRepository;
 	}
 
 	@GetMapping("/vets.html")
-	public String showVetList(@RequestParam(defaultValue = "1") int page, Model model,
-			RedirectAttributes redirectAttributes) {
-		Page<Vet> paginated = findPaginated(page);
+	public String showVetList(@RequestParam(defaultValue = "1") int page,
+			@RequestParam(required = false) Integer specialty, Model model, RedirectAttributes redirectAttributes) {
+		Page<Vet> paginated = findPaginated(page, specialty);
 		if (page < 1 || page > Math.max(paginated.getTotalPages(), 1)) {
 			redirectAttributes.addAttribute("page", 1);
+			if (specialty != null) {
+				redirectAttributes.addAttribute("specialty", specialty);
+			}
 			return "redirect:/vets.html";
 		}
-		return addPaginationModel(page, paginated, model);
+		return addPaginationModel(page, specialty, paginated, model);
 	}
 
-	private String addPaginationModel(int page, Page<Vet> paginated, Model model) {
+	private String addPaginationModel(int page, Integer specialty, Page<Vet> paginated, Model model) {
 		List<Vet> listVets = paginated.getContent();
 		model.addAttribute("currentPage", page);
 		model.addAttribute("totalPages", paginated.getTotalPages());
 		model.addAttribute("totalItems", paginated.getTotalElements());
 		model.addAttribute("listVets", listVets);
+		model.addAttribute("specialties", specialtyRepository.findSpecialties());
+		model.addAttribute("selectedSpecialty", specialty);
 		return "vets/vetList";
 	}
 
-	private Page<Vet> findPaginated(int page) {
+	private Page<Vet> findPaginated(int page, Integer specialty) {
 		int pageSize = 5;
 		int safePage = Math.max(page, 1);
 		Pageable pageable = PageRequest.of(safePage - 1, pageSize);
-		return vetRepository.findAll(pageable);
+		if (specialty == null) {
+			return vetRepository.findAll(pageable);
+		}
+		return vetRepository.findBySpecialtyId(specialty, pageable);
 	}
 
 	@GetMapping({ "/vets" })
